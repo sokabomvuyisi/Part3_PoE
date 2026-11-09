@@ -6,14 +6,24 @@ using RaceDay.Mvc.Services;
 
 namespace RaceDay.Mvc.Controllers;
 
+/// <summary>
+/// MVC controller for all organiser-facing pages:
+/// dashboard, event CRUD, category management, enrolment status updates and result entry.
+/// Every action first verifies that the current session belongs to an Organiser.
+/// </summary>
 public class OrganiserController : RaceDayControllerBase
 {
     private readonly ApiService _api;
 
     public OrganiserController(ApiService api) => _api = api;
 
+    /// <summary>Returns true when the current session role is "Organiser".</summary>
     private bool IsOrganiser() => HttpContext.Session.GetString("Role") == "Organiser";
 
+    /// <summary>
+    /// Guards every organiser action. Redirects to login if there is no session,
+    /// or to the home page if the logged-in user is not an organiser.
+    /// </summary>
     private IActionResult? RequireOrganiser()
     {
         if (HttpContext.Session.GetInt32("UserId") == null)
@@ -22,7 +32,9 @@ public class OrganiserController : RaceDayControllerBase
         return null;
     }
 
-    // Dashboard
+    // ========== Dashboard ==========
+
+    /// <summary>Shows a summary of the organiser's own events.</summary>
     public async Task<IActionResult> Dashboard()
     {
         var auth = RequireOrganiser(); if (auth != null) return auth;
@@ -30,7 +42,9 @@ public class OrganiserController : RaceDayControllerBase
         return View(events);
     }
 
-    // Events list
+    // ========== Events ==========
+
+    /// <summary>Lists all events owned by the current organiser.</summary>
     public async Task<IActionResult> Events()
     {
         var auth = RequireOrganiser(); if (auth != null) return auth;
@@ -38,6 +52,7 @@ public class OrganiserController : RaceDayControllerBase
         return View(events);
     }
 
+    /// <summary>Shows the form for creating a new event (default date = 14 days from today).</summary>
     [HttpGet]
     public IActionResult CreateEvent()
     {
@@ -45,6 +60,10 @@ public class OrganiserController : RaceDayControllerBase
         return View(new CreateEventRequest { EventDate = DateTime.Today.AddDays(14) });
     }
 
+    /// <summary>
+    /// Creates a new event and optionally uploads a banner image.
+    /// Banner upload failure does not roll back the event creation; a warning is shown instead.
+    /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateEvent(CreateEventRequest model, IFormFile? banner)
@@ -61,6 +80,7 @@ public class OrganiserController : RaceDayControllerBase
 
         TempData["Success"] = "Event created successfully.";
 
+        // Optional banner upload after the event has been created
         if (banner != null && banner.Length > 0 && data != null)
         {
             var (bannerOk, _, bannerError) = await _api.UploadEventBannerAsync(data.EventId, banner);
@@ -71,6 +91,7 @@ public class OrganiserController : RaceDayControllerBase
         return RedirectToAction("Events");
     }
 
+    /// <summary>Loads an existing event into the edit form.</summary>
     [HttpGet]
     public async Task<IActionResult> EditEvent(int id)
     {
@@ -93,6 +114,9 @@ public class OrganiserController : RaceDayControllerBase
         });
     }
 
+    /// <summary>
+    /// Updates event details and optionally replaces the banner image.
+    /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditEvent(int id, UpdateEventRequest model, IFormFile? banner)
@@ -120,6 +144,7 @@ public class OrganiserController : RaceDayControllerBase
         return RedirectToAction("Events");
     }
 
+    /// <summary>Deletes an event owned by the current organiser.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteEvent(int id)
@@ -131,13 +156,16 @@ public class OrganiserController : RaceDayControllerBase
         return RedirectToAction("Events");
     }
 
-    // Categories
+    // ========== Categories ==========
+
+    /// <summary>Shows the categories belonging to a given event together with an "add" form.</summary>
     public async Task<IActionResult> Categories(int eventId)
     {
         var auth = RequireOrganiser(); if (auth != null) return auth;
         return View(await BuildCategoriesViewModel(eventId, new CreateCategoryRequest()));
     }
 
+    /// <summary>Builds the view model used by the Categories page.</summary>
     private async Task<CategoriesPageViewModel> BuildCategoriesViewModel(int eventId, CreateCategoryRequest newCategory)
     {
         return new CategoriesPageViewModel
@@ -148,6 +176,7 @@ public class OrganiserController : RaceDayControllerBase
         };
     }
 
+    /// <summary>Adds a new category to the specified event.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddCategory(int eventId, [Bind(Prefix = "NewCategory")] CreateCategoryRequest model)
@@ -163,6 +192,7 @@ public class OrganiserController : RaceDayControllerBase
         return RedirectToAction("Categories", new { eventId });
     }
 
+    /// <summary>Deletes a category. The eventId is only used for the redirect.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteCategory(int id, int eventId)
@@ -174,7 +204,9 @@ public class OrganiserController : RaceDayControllerBase
         return RedirectToAction("Categories", new { eventId });
     }
 
-    // Enrolments
+    // ========== Enrolments ==========
+
+    /// <summary>Lists all enrolments for a specific event so the organiser can confirm or cancel them.</summary>
     public async Task<IActionResult> Enrolments(int eventId)
     {
         var auth = RequireOrganiser(); if (auth != null) return auth;
@@ -183,6 +215,7 @@ public class OrganiserController : RaceDayControllerBase
         return View(list);
     }
 
+    /// <summary>Updates the status of a single enrolment (Pending / Confirmed / Cancelled).</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateEnrolmentStatus(int id, int eventId, string status)
@@ -194,7 +227,11 @@ public class OrganiserController : RaceDayControllerBase
         return RedirectToAction("Enrolments", new { eventId });
     }
 
-    // Results
+    // ========== Results ==========
+
+    /// <summary>
+    /// Shows enrolments and existing results for an event so the organiser can enter finish times.
+    /// </summary>
     public async Task<IActionResult> Results(int eventId)
     {
         var auth = RequireOrganiser(); if (auth != null) return auth;
@@ -205,9 +242,14 @@ public class OrganiserController : RaceDayControllerBase
         return View(enrolments);
     }
 
+    /// <summary>Accepted finish-time formats (hours may be 1 or 2 digits, optional fractional seconds).</summary>
     private static readonly string[] FinishTimeFormats =
         { @"h\:mm\:ss", @"hh\:mm\:ss", @"h\:mm\:ss\.FFF", @"hh\:mm\:ss\.FFF" };
 
+    /// <summary>
+    /// Records a race result for an enrolment.
+    /// Finish time is validated against a small set of common formats before being sent to the API.
+    /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddResult(int eventId, int enrolmentId, string? finishTime, int position)
