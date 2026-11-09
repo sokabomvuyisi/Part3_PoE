@@ -5,12 +5,21 @@ using RaceDay.Mvc.Services;
 
 namespace RaceDay.Mvc.Controllers;
 
+/// <summary>
+/// MVC controller for all participant-facing pages:
+/// browsing events, enrolling, viewing own enrolments/results, and managing the profile.
+/// Every action first verifies that the current session belongs to a Participant.
+/// </summary>
 public class ParticipantController : RaceDayControllerBase
 {
     private readonly ApiService _api;
 
     public ParticipantController(ApiService api) => _api = api;
 
+    /// <summary>
+    /// Guards every participant action. Redirects to login if there is no session,
+    /// or to the home page if the logged-in user is not a participant.
+    /// </summary>
     private IActionResult? RequireParticipant()
     {
         if (HttpContext.Session.GetInt32("UserId") == null)
@@ -20,7 +29,12 @@ public class ParticipantController : RaceDayControllerBase
         return null;
     }
 
-    // Home - upcoming events with optional filter
+    // ========== Event browsing ==========
+
+    /// <summary>
+    /// Lists upcoming events. Optional query parameters filter by event type and/or location.
+    /// Only events whose date is today or later are shown, ordered by date ascending.
+    /// </summary>
     public async Task<IActionResult> Index(string? type = null, string? location = null)
     {
         var auth = RequireParticipant(); if (auth != null) return auth;
@@ -35,7 +49,9 @@ public class ParticipantController : RaceDayControllerBase
         return View(events);
     }
 
-    // Event detail + enrol
+    /// <summary>
+    /// Shows a single event together with its available categories so the participant can enrol.
+    /// </summary>
     public async Task<IActionResult> EventDetail(int id)
     {
         var auth = RequireParticipant(); if (auth != null) return auth;
@@ -49,6 +65,9 @@ public class ParticipantController : RaceDayControllerBase
         return View(ev);
     }
 
+    /// <summary>
+    /// Submits an enrolment for the current participant into the chosen event/category.
+    /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Enrol(int eventId, int categoryId)
@@ -73,7 +92,9 @@ public class ParticipantController : RaceDayControllerBase
         return RedirectToAction("EventDetail", new { id = eventId });
     }
 
-    // My Events
+    // ========== My data ==========
+
+    /// <summary>Lists all enrolments belonging to the current participant.</summary>
     public async Task<IActionResult> MyEvents()
     {
         var auth = RequireParticipant(); if (auth != null) return auth;
@@ -81,7 +102,7 @@ public class ParticipantController : RaceDayControllerBase
         return View(list);
     }
 
-    // My Results
+    /// <summary>Lists all race results belonging to the current participant.</summary>
     public async Task<IActionResult> MyResults()
     {
         var auth = RequireParticipant(); if (auth != null) return auth;
@@ -89,7 +110,11 @@ public class ParticipantController : RaceDayControllerBase
         return View(list);
     }
 
-    // Profile
+    // ========== Profile ==========
+
+    /// <summary>
+    /// Shows the participant's profile. If the API session has expired the user is sent back to login.
+    /// </summary>
     public async Task<IActionResult> Profile()
     {
         var auth = RequireParticipant(); if (auth != null) return auth;
@@ -105,6 +130,7 @@ public class ParticipantController : RaceDayControllerBase
         return View(ToViewModel(profile));
     }
 
+    /// <summary>Updates the participant's name and email.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdateProfile([Bind(Prefix = "Form")] UpdateProfileRequest model)
@@ -125,6 +151,7 @@ public class ParticipantController : RaceDayControllerBase
         return RedirectToAction("Profile");
     }
 
+    /// <summary>Uploads a new profile picture to Azure Blob Storage via the API.</summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadPicture(IFormFile? picture)
@@ -142,6 +169,10 @@ public class ParticipantController : RaceDayControllerBase
         return RedirectToAction("Profile");
     }
 
+    /// <summary>
+    /// Converts a ProfileDto into the view model that the Profile page expects
+    /// (read-only display data + editable form fields).
+    /// </summary>
     private static ProfilePageViewModel ToViewModel(ProfileDto profile) => new()
     {
         Profile = profile,
