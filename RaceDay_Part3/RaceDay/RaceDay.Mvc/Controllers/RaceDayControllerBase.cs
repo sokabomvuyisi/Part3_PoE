@@ -2,6 +2,11 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace RaceDay.Mvc.Controllers;
 
+/// <summary>
+/// Base class for MVC controllers that talk to the RaceDay API.
+/// Provides a small helper that turns a failed API call into a friendly TempData error
+/// so the UI can display a message instead of crashing.
+/// </summary>
 public abstract class RaceDayControllerBase : Controller
 {
     /// <summary>
