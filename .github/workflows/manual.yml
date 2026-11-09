@@ -1,32 +1,110 @@
-# This is a basic workflow that is manually triggered
+# RaceDay CI/CD workflow
+# Builds the .NET 8 solution and the MVC Docker image.
+# Can be started automatically (on push/PR) or manually from the Actions tab.
 
-name: Manual workflow
+name: RaceDay CI
 
-# Controls when the action will run. Workflow runs when manually triggered using the UI
-# or API.
+# Controls when the action will run.
 on:
+  # Run automatically when code is pushed to these branches
+  push:
+    branches: [ main, master, develop ]
+
+  # Run automatically on pull requests targeting these branches
+  pull_request:
+    branches: [ main, master, develop ]
+
+  # Also allow the workflow to be started manually from the GitHub Actions UI
   workflow_dispatch:
-    # Inputs the workflow accepts.
+    # Optional inputs shown when you click "Run workflow"
     inputs:
-      name:
-        # Friendly description to be shown in the UI instead of 'name'
-        description: 'Person to greet'
-        # Default value if no value is explicitly provided
-        default: 'World'
-        # Input has to be provided for the workflow to run
+      configuration:
+        description: 'Build configuration'
         required: true
-        # The data type of the input
-        type: string
+        default: 'Release'
+        type: choice
+        options:
+          - Release
+          - Debug
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "greet"
-  greet:
+  # ---------- Job 1: Build the .NET solution ----------
+  build:
+    name: Build solution
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Runs a single command using the runners shell
-    - name: Send greeting
-      run: echo "Hello ${{ inputs.name }}"
+      # Checks out your repository under $GITHUB_WORKSPACE so the job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Installs the .NET 8 SDK on the runner
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Restores all NuGet packages for the solution
+      - name: Restore dependencies
+        run: dotnet restore RaceDay.sln
+
+      # Compiles the whole solution (API + Contracts + MVC)
+      - name: Build
+        run: dotnet build RaceDay.sln --configuration ${{ inputs.configuration || 'Release' }} --no-restore
+
+      # Publishes the API project to a folder (ready to deploy)
+      - name: Publish API
+        run: |
+          dotnet publish RaceDay.Api/RaceDay.Api.csproj \
+            --configuration ${{ inputs.configuration || 'Release' }} \
+            --no-build \
+            --output ./publish/api
+
+      # Publishes the MVC project to a folder (ready to deploy)
+      - name: Publish MVC
+        run: |
+          dotnet publish RaceDay.Mvc/RaceDay.Mvc.csproj \
+            --configuration ${{ inputs.configuration || 'Release' }} \
+            --no-build \
+            --output ./publish/mvc
+
+      # Uploads the published folders so you can download them from the Actions run
+      - name: Upload publish artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: raceday-publish
+          path: ./publish
+          retention-days: 7
+
+  # ---------- Job 2: Build the Docker image ----------
+  docker:
+    name: Build Docker image
+    # Wait for the build job to finish successfully first
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks out the code again (each job starts clean)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Sets up Docker Buildx (modern Docker builder)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Builds the multi-stage MVC Docker image defined in RaceDay.Mvc/Dockerfile
+      # push: false means we only build it here – we do not push to a registry
+      - name: Build MVC image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: RaceDay.Mvc/Dockerfile
+          push: false
+          tags: raceday-mvc:latest
+
+      # Quick check that the image exists on the runner
+      - name: Verify image
+        run: docker images raceday-mvc
