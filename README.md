@@ -50,10 +50,10 @@ ASP.NET Core race event management system with role-based interfaces for Organis
 ```bash
 cd RaceDay.Api
 dotnet restore
-dotnet run
+dotnet run```
 Note the HTTPS port.
 
-## 2. Configure MVC API base URL
+### 2. Configure MVC API base URL
 
 Edit RaceDay.Mvc/appsettings.Development.json and set:
 "ApiBaseUrl": "https://localhost:7203/"Use the same HTTPS port shown when the API started.3. Start the MVC appcd RaceDay.Mvc
