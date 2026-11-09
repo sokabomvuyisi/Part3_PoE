@@ -35,7 +35,7 @@ ASP.NET Core race event management system with role-based interfaces for Organis
 - Profile and profile picture upload
 
 ### Azure Blob Storage
-- Containers: `event-banners`, `profile-pictures`
+- Containers: event-banners, profile-pictures
 - All uploads go through the API only
 
 ### UI
