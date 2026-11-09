@@ -284,3 +284,7 @@ This separation keeps the presentation layer responsible for the user experience
 
 ## Screenshot of Docker
 <img width="1901" height="775" alt="image" src="https://github.com/user-attachments/assets/b5bb3bee-f9bf-4060-8c90-6922ec5edd2f" />
+
+## CI screenshots
+<img width="1862" height="851" alt="image" src="https://github.com/user-attachments/assets/0e56e672-e81c-4550-852c-b9c99cfec44e" />
+
