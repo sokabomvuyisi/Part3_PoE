@@ -44,10 +44,3 @@ ASP.NET Core race event management system with role-based interfaces for Organis
 - Colour-coded enrolment statuses
 - Responsive layout
 
-## How to Run Locally
-
-### 1. Start the API
-```bash
-cd RaceDay.Api
-dotnet restore
-dotnet run
